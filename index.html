@@ -2,15 +2,17 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <!-- 전체 화면(노치/다이내믹 아일랜드 포함) 렌더링을 위한 viewport-fit=cover -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>온누리상품권 주유맵</title>
   
+  <!-- iOS Safari 상단 노치/다이내믹 아일랜드 일체화 설정 -->
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
   <!-- 파비콘 및 iOS 홈 화면 아이콘 -->
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="favicon.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <!-- 카카오맵 JavaScript SDK -->
   <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=c42d4b9380996995f8fabb3d2cdaaf8f&libraries=services"></script>
@@ -18,14 +20,13 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     
-    /* 1. 화면 전체(다이내믹 아일랜드 포함) 꽉 채우기 */
     html, body {
       width: 100%;
       height: 100%;
       height: 100dvh;
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", sans-serif;
-      background: #000000;
+      background: #eef0f3;
     }
     
     #app-container {
@@ -37,7 +38,7 @@
       flex-direction: column;
     }
     
-    /* 지도를 화면 최상단/최하단까지 확장 */
+    /* 지도: 상단 노치 영역까지 확장 */
     #map {
       width: 100%;
       height: 100%;
@@ -47,26 +48,25 @@
       z-index: 1;
     }
 
-    /* 상단 헤더: 다이내믹 아일랜드 바로 아래로 자연스럽게 배치 */
+    /* 상단 헤더: 다이내믹 아일랜드 아래 플로팅 */
     .top-header {
       position: absolute;
-      top: calc(14px + env(safe-area-inset-top));
+      top: calc(10px + env(safe-area-inset-top));
       left: 14px;
       right: 14px;
       z-index: 10;
-      background: rgba(255, 255, 255, 0.88);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       padding: 8px 12px;
       border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
-      border: 1px solid rgba(255, 255, 255, 0.4);
+      box-shadow: 0 4px 18px rgba(0,0,0,0.12);
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
     .app-brand { display: flex; align-items: center; gap: 8px; }
-    .app-logo { width: 26px; height: 26px; border-radius: 6px; }
+    .app-logo { width: 24px; height: 24px; border-radius: 6px; }
     .app-title { font-size: 15px; font-weight: 800; color: #1a73e8; letter-spacing: -0.3px; }
 
     .fuel-selector { display: flex; background: rgba(0,0,0,0.06); padding: 3px; border-radius: 10px; gap: 2px; }
@@ -82,14 +82,12 @@
       right: 16px;
       bottom: 280px;
       z-index: 10;
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      background: #ffffff;
       width: 44px;
       height: 44px;
       border-radius: 50%;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.2);
-      border: 1px solid rgba(255, 255, 255, 0.6);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+      border: none;
       font-size: 20px;
       display: flex;
       align-items: center;
@@ -99,7 +97,7 @@
     }
     .gps-btn:active { transform: scale(0.92); }
 
-    /* 심플 미니 가격 뱃지 마커 */
+    /* 미니 가격 마커 */
     .mini-price-badge {
       background: #1a73e8; color: #ffffff; padding: 3px 7px; border-radius: 12px;
       font-size: 11px; font-weight: 800; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
@@ -108,7 +106,7 @@
     .mini-price-badge:hover { transform: scale(1.1); z-index: 15; }
     .mini-price-badge.selected { background: #d93025; border-color: #ffebee; transform: scale(1.15); z-index: 20; }
 
-    /* 2. 드래그 가능한 하단 바텀시트 */
+    /* 바텀시트 */
     .bottom-sheet {
       position: absolute;
       bottom: 0;
@@ -116,16 +114,13 @@
       right: 0;
       height: 270px;
       min-height: 130px;
-      max-height: 86dvh;
+      max-height: 85dvh;
       z-index: 10;
-      background: rgba(255, 255, 255, 0.96);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-radius: 24px 24px 0 0;
-      box-shadow: 0 -6px 28px rgba(0,0,0,0.15);
+      background: #ffffff;
+      border-radius: 22px 22px 0 0;
+      box-shadow: 0 -6px 24px rgba(0,0,0,0.12);
       display: flex;
       flex-direction: column;
-      border-top: 1px solid rgba(255, 255, 255, 0.6);
     }
     
     .drag-handle-area {
@@ -136,13 +131,12 @@
       display: flex;
       justify-content: center;
       user-select: none;
-      -webkit-user-select: none;
     }
     .drag-handle-area:active { cursor: grabbing; }
-    .sheet-handle { width: 44px; height: 5px; background: #dcdfe6; border-radius: 3px; pointer-events: none; }
+    .sheet-handle { width: 42px; height: 4px; background: #dcdfe6; border-radius: 3px; pointer-events: none; }
     
     .sort-bar {
-      display: flex; gap: 6px; padding: 4px 14px 10px 14px; overflow-x: auto; border-bottom: 1px solid rgba(0,0,0,0.05);
+      display: flex; gap: 6px; padding: 4px 14px 10px 14px; overflow-x: auto; border-bottom: 1px solid #f0f0f0;
       scrollbar-width: none; flex-shrink: 0; user-select: none;
     }
     .sort-bar::-webkit-scrollbar { display: none; }
@@ -152,7 +146,6 @@
     }
     .sort-btn.active { background: #e8f0fe; color: #1a73e8; border-color: #1a73e8; }
 
-    /* 목록 래퍼 (그라데이션 효과 적용 부모 컨테이너) */
     .station-list-container {
       position: relative;
       flex: 1;
@@ -161,27 +154,23 @@
       flex-direction: column;
     }
 
-    /* 하단 주유소 목록: 마지막 카드 보장 여백 (카드 1.5개 높이 = 약 120px) */
+    /* 목록 하단 넉넉한 여백 확보 (사파리 툴바 및 그라데이션 가림 방지) */
     .station-list {
       flex: 1;
       overflow-y: auto;
-      padding: 8px 14px calc(120px + env(safe-area-inset-bottom)) 14px;
+      padding: 10px 14px calc(90px + env(safe-area-inset-bottom)) 14px;
       -webkit-overflow-scrolling: touch;
     }
     
-    /* 3. 하단 사파리 툴바 영역 블러 & 그라데이션 오버레이 */
+    /* 하단 미세 블러 그라데이션 */
     .bottom-blur-gradient {
       position: absolute;
       bottom: 0;
       left: 0;
       right: 0;
-      height: calc(85px + env(safe-area-inset-bottom));
+      height: calc(35px + env(safe-area-inset-bottom));
       pointer-events: none;
-      background: linear-gradient(to top, rgba(255, 255, 255, 0.96) 20%, rgba(255, 255, 255, 0.6) 60%, rgba(255, 255, 255, 0) 100%);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      mask-image: linear-gradient(to top, black 30%, transparent 100%);
-      -webkit-mask-image: linear-gradient(to top, black 30%, transparent 100%);
+      background: linear-gradient(to top, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0));
       z-index: 5;
     }
 
@@ -208,7 +197,6 @@
 <body>
 
   <div id="app-container">
-    <!-- 상단 헤더 -->
     <div class="top-header">
       <div class="app-brand">
         <img src="favicon.png" alt="logo" class="app-logo" onerror="this.style.display='none'">
@@ -221,11 +209,9 @@
       </div>
     </div>
 
-    <!-- 내 위치 버튼 -->
     <button class="gps-btn" id="gps-btn" onclick="moveToCurrentLocation()" title="내 위치 이동">📍</button>
     <div id="map"></div>
 
-    <!-- 하단 바텀시트 -->
     <div class="bottom-sheet" id="bottom-sheet">
       <div class="drag-handle-area" id="drag-handle">
         <div class="sheet-handle"></div>
@@ -237,7 +223,6 @@
         <button class="sort-btn" id="sort-distance" onclick="setSortMode('distance')">가까운 거리순</button>
       </div>
       
-      <!-- 목록 및 하단 그라데이션 블러 영역 -->
       <div class="station-list-container">
         <div class="station-list" id="station-list">
           <div style="text-align:center; padding: 24px; color:#888; font-size:13px;">주유소 데이터를 불러오는 중...</div>
@@ -494,7 +479,7 @@
       }
     }
 
-    // 바텀시트 드래그 제스처
+    // 바텀시트 제스처
     const bottomSheet = document.getElementById('bottom-sheet');
     const dragHandle = document.getElementById('drag-handle');
     const gpsBtn = document.getElementById('gps-btn');
@@ -510,7 +495,7 @@
     function onDrag(clientY) {
       if (!isDragging) return;
       const deltaY = startY - clientY;
-      const newHeight = Math.min(Math.max(startHeight + deltaY, 130), window.innerHeight * 0.86);
+      const newHeight = Math.min(Math.max(startHeight + deltaY, 130), window.innerHeight * 0.85);
       bottomSheet.style.height = `${newHeight}px`;
       gpsBtn.style.bottom = `${newHeight + 20}px`;
     }
