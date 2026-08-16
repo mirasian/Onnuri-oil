@@ -91,8 +91,12 @@ def parse_and_update_sheet(excel_bytes, spreadsheet_id, sa_json_str):
     df = df.fillna("")
     rows = [df.columns.tolist()] + df.astype(str).values.tolist()
     
-    # 구글 스프레드시트 API 연동
-    service_account_info = json.loads(sa_json_str)
+    # 구글 스프레드시트 API 연동 (민감 정보 노출 방지 처리)
+    try:
+        service_account_info = json.loads(sa_json_str)
+    except Exception:
+        raise ValueError("GCP_SA_KEY의 JSON 형식이 올바르지 않습니다.")
+
     scopes = ['https://www.googleapis.com/auth/spreadsheets']
     creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
     service = build('sheets', 'v4', credentials=creds)
@@ -118,6 +122,12 @@ def parse_and_update_sheet(excel_bytes, spreadsheet_id, sa_json_str):
 if __name__ == "__main__":
     spreadsheet_id = os.environ.get("SPREADSHEET_ID")
     sa_json = os.environ.get("GCP_SA_KEY")
+    
+    # 필수 환경 변수 검증
+    if not spreadsheet_id:
+        raise ValueError("환경 변수 'SPREADSHEET_ID'가 설정되지 않았습니다. GitHub Secrets를 확인하세요.")
+    if not sa_json:
+        raise ValueError("환경 변수 'GCP_SA_KEY'가 설정되지 않았습니다. GitHub Secrets를 확인하세요.")
     
     excel_bytes = download_opinet_excel()
     parse_and_update_sheet(excel_bytes, spreadsheet_id, sa_json)
