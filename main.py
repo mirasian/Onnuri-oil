@@ -1,12 +1,10 @@
+import csv
 import io
 import json
 import os
-from datetime import datetime
-import pytz
 import requests
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
 
 def download_opinet():
     """오피넷에서 사업자별 현재 판매가격(주유소) CSV 파일 다운로드"""
@@ -28,47 +26,53 @@ def download_opinet():
     
     response = session.post(url, data=payload, headers=headers)
     if response.status_code == 200 and len(response.content) > 1000:
-        return response.content
+        # CP949 또는 UTF-8 디코딩 처리
+        try:
+            return response.content.decode('cp949')
+        except UnicodeDecodeError:
+            return response.content.decode('utf-8')
     else:
         raise Exception(f"오피넷 다운로드 실패 (상태 코드: {response.status_code})")
 
-def upload_to_drive(file_content, filename, folder_id, sa_json_str):
-    """구글 드라이브 지정 폴더로 파일 업로드"""
+def update_google_sheet(csv_text, spreadsheet_id, sa_json_str):
+    """구글 스프레드시트에 유가 데이터 쓰기"""
     service_account_info = json.loads(sa_json_str)
-    scopes = ['https://www.googleapis.com/auth/drive']
+    scopes = ['https://www.googleapis.com/auth/spreadsheets']
     creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
-    service = build('drive', 'v3', credentials=creds)
+    service = build('sheets', 'v4', credentials=creds)
     
-    file_metadata = {
-        'name': filename,
-        'parents': [folder_id]
-    }
+    # CSV 텍스트를 2차원 배열(리스트)로 파싱
+    csv_reader = csv.reader(io.StringIO(csv_text))
+    rows = list(csv_reader)
     
-    media = MediaIoBaseUpload(
-        io.BytesIO(file_content),
-        mimetype='text/csv',
-        resumable=True
-    )
+    # 첫 번째 시트 이름 가져오기
+    sheet_metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    sheet_name = sheet_metadata['sheets'][0]['properties']['title']
     
-    file = service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields='id'
+    # 기존 데이터 초기화
+    service.spreadsheets().values().clear(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{sheet_name}'!A:Z"
     ).execute()
     
-    print(f"구글 드라이브 업로드 완료: {filename} (ID: {file.get('id')})")
+    # 새 데이터 입력
+    body = {'values': rows}
+    service.spreadsheets().values().update(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{sheet_name}'!A1",
+        valueInputOption="USER_ENTERED",
+        body=body
+    ).execute()
+    
+    print(f"구글 스프레드시트 갱신 완료: 총 {len(rows)}행 입력됨")
 
 if __name__ == "__main__":
-    kst = pytz.timezone('Asia/Seoul')
-    today_str = datetime.now(kst).strftime('%Y%m%d')
-    filename = f"현재_판매가격(주유소)_{today_str}.csv"
-    
-    folder_id = os.environ.get("DRIVE_FOLDER_ID")
+    spreadsheet_id = os.environ.get("SPREADSHEET_ID")
     sa_json = os.environ.get("GCP_SA_KEY")
     
     print("1. 오피넷 유가 데이터 수집 시작...")
-    content = download_opinet()
+    csv_text = download_opinet()
     
-    print("2. 구글 드라이브 업로드 시작...")
-    upload_to_drive(content, filename, folder_id, sa_json)
+    print("2. 구글 스프레드시트 업데이트 시작...")
+    update_google_sheet(csv_text, spreadsheet_id, sa_json)
     print("모든 작업이 성공적으로 완료되었습니다.")
