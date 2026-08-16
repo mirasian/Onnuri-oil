@@ -2,9 +2,9 @@ name: Opinet Daily Auto Sync
 
 on:
   schedule:
-    # 한국 시간(KST) 매일 07:30 = UTC 기준 22:30 (전날)
+    # 한국 시간 매일 07:30 (UTC 22:30 전날)
     - cron: '30 22 * * *'
-  workflow_dispatch: # 웹에서 수동으로 즉시 실행할 수 있는 버튼 활성화
+  workflow_dispatch:
 
 jobs:
   sync:
@@ -21,11 +21,11 @@ jobs:
 
       - name: 필수 라이브러리 설치
         run: |
-          pip install requests google-api-python-client google-auth pytz
+          pip install requests google-api-python-client google-auth
 
-      - name: 유가 다운로드 및 구글 드라이브 업로드 실행
+      - name: 유가 다운로드 및 구글 시트 갱신 실행
         env:
-          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         run: |
           python main.py
