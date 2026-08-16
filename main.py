@@ -8,7 +8,7 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 
 def download_opinet_excel():
-    """새 팝업창(새 탭)에서 발생하는 다운로드 이벤트까지 모두 감지하여 엑셀 수신"""
+    """확인 팝업창(Dialog) 자동 수락 및 오피넷 엑셀 파일 다운로드"""
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
@@ -19,62 +19,41 @@ def download_opinet_excel():
             accept_downloads=True
         )
         
-        # 다운로드된 파일 저장용 변수
-        download_container = []
-
-        # 컨텍스트 내의 모든 탭/팝업에서 다운로드 이벤트 수신 대기
-        def on_download(download):
-            temp_path = download.path()
-            with open(temp_path, "rb") as f:
-                download_container.append(f.read())
-            print(f"다운로드 파일 수신 성공: {download.suggested_filename}")
-
-        # 새 페이지(팝업)가 열릴 때도 다운로드 리스너 연결
-        def on_page(new_page):
-            new_page.on("download", on_download)
-
-        context.on("page", on_page)
-
         page = context.new_page()
-        page.on("download", on_download)
+
+        # 브라우저에 '다운로드 받으시겠습니까?' 등 confirm/alert 팝업이 뜰 때 자동으로 '확인(OK)' 클릭 처리
+        def handle_dialog(dialog):
+            print(f"브라우저 팝업 감지: '{dialog.message}' -> [확인] 자동 클릭")
+            dialog.accept()
+
+        page.on("dialog", handle_dialog)
 
         print("1. 오피넷 유가내려받기 페이지 접속 중...")
         page.goto("https://www.opinet.co.kr/user/opdown/opDownload.do", wait_until="networkidle", timeout=60000)
 
-        # 엑셀저장 버튼 대기
+        # 엑셀저장 버튼 요소 대기
         btn = page.wait_for_selector('a[href*="fn_Download(2)"]', timeout=30000)
         time.sleep(2)
 
-        print("2. 엑셀저장 버튼 클릭 및 다운로드 대기...")
-        btn.click()
+        print("2. 엑셀저장 버튼 클릭 및 다운로드 대기 (팝업 자동 확인)...")
+        with page.expect_download(timeout=60000) as download_info:
+            btn.click()
 
-        # 파일 다운로드가 완료될 때까지 최대 30초 대기
-        for _ in range(30):
-            if download_container:
-                break
-            time.sleep(1)
+        download = download_info.value
+        temp_path = download.path()
+        print(f"다운로드 성공: {download.suggested_filename}")
 
-        # 클릭으로 감지가 안 되었을 경우 JS 강제 실행 후 재대기
-        if not download_container:
-            print("자바스크립트 fn_Download(2) 직접 호출...")
-            page.evaluate("fn_Download(2);")
-            for _ in range(30):
-                if download_container:
-                    break
-                time.sleep(1)
+        with open(temp_path, "rb") as f:
+            excel_bytes = f.read()
 
         browser.close()
-
-        if not download_container:
-            raise Exception("엑셀 파일 다운로드에 실패했습니다. (다운로드 이벤트 감지 안 됨)")
-
-        return download_container[0]
+        return excel_bytes
 
 def parse_and_update_sheet(excel_bytes, spreadsheet_id, sa_json_str):
     """다운로드된 유가 데이터를 파싱하여 구글 스프레드시트에 기록"""
     df = None
     
-    # 1. HTML Table 포맷 XLS 파싱 시도
+    # 1. HTML Table 포맷 XLS 파싱 시도 (오피넷 엑셀 기본 형태)
     for enc in ['cp949', 'euc-kr', 'utf-8']:
         try:
             text = excel_bytes.decode(enc)
@@ -85,7 +64,7 @@ def parse_and_update_sheet(excel_bytes, spreadsheet_id, sa_json_str):
         except Exception:
             continue
 
-    # 2. 일반 바이너리 엑셀(XLS/XLSX) 파싱 시도
+    # 2. 일반 바이너리 엑셀 파싱 시도
     if df is None or len(df) == 0:
         for engine in ['xlrd', 'openpyxl', None]:
             try:
@@ -108,7 +87,7 @@ def parse_and_update_sheet(excel_bytes, spreadsheet_id, sa_json_str):
     if df is None or len(df) == 0:
         raise Exception(f"유가 데이터 파싱 실패 (수신 바이트 크기: {len(excel_bytes)})")
 
-    # NaN 정리 및 2차원 리스트 구성
+    # NaN 값 빈칸 처리 및 2차원 리스트 구성
     df = df.fillna("")
     rows = [df.columns.tolist()] + df.astype(str).values.tolist()
     
@@ -134,7 +113,7 @@ def parse_and_update_sheet(excel_bytes, spreadsheet_id, sa_json_str):
         body={'values': rows}
     ).execute()
     
-    print(f"구글 스프레드시트 갱신 성공: 총 {len(rows)}개 행 입력 완료")
+    print(f"구글 스프레드시트 갱신 성공: 총 {len(rows)}개 주유소 유가 데이터 입력 완료")
 
 if __name__ == "__main__":
     spreadsheet_id = os.environ.get("SPREADSHEET_ID")
