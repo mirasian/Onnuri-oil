@@ -21,7 +21,7 @@ jobs:
 
       - name: 필수 라이브러리 설치
         run: |
-          pip install requests google-api-python-client google-auth
+          pip install requests google-api-python-client google-auth pytz
 
       - name: 유가 다운로드 및 구글 시트 갱신 실행
         env:
