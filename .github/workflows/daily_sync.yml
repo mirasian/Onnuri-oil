@@ -2,8 +2,7 @@ name: Opinet Daily Auto Sync
 
 on:
   schedule:
-    # 한국 시간 매일 07:30 (UTC 22:30 전날)
-    - cron: '30 22 * * *'
+    - cron: '30 22 * * *' # 한국 시간 매일 07:30
   workflow_dispatch:
 
 jobs:
@@ -21,7 +20,7 @@ jobs:
 
       - name: 필수 라이브러리 설치
         run: |
-          pip install requests google-api-python-client google-auth pytz
+          pip install requests pandas openpyxl xlrd lxml html5lib google-api-python-client google-auth
 
       - name: 유가 다운로드 및 구글 시트 갱신 실행
         env:
