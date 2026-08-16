@@ -1,0 +1,31 @@
+name: Opinet Daily Auto Sync
+
+on:
+  schedule:
+    # 한국 시간(KST) 매일 07:30 = UTC 기준 22:30 (전날)
+    - cron: '30 22 * * *'
+  workflow_dispatch: # 웹에서 수동으로 즉시 실행할 수 있는 버튼 활성화
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 파이썬 3.10 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 필수 라이브러리 설치
+        run: |
+          pip install requests google-api-python-client google-auth pytz
+
+      - name: 유가 다운로드 및 구글 드라이브 업로드 실행
+        env:
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          python main.py
