@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>온누리상품권 주유맵</title>
+  <!-- 카카오맵 JavaScript 키 입력 -->
+  <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=c42d4b9380996995f8fabb3d2cdaaf8f&libraries=services,clusterer"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html { width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; }
+    #map { width: 100%; height: 100%; }
+    
+    .header-bar {
+      position: absolute; top: 12px; left: 12px; right: 12px; z-index: 10;
+      background: white; padding: 10px 14px; border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; justify-content: space-between; align-items: center;
+    }
+    .header-title { font-weight: 700; font-size: 16px; color: #1a73e8; }
+    .fuel-toggle button {
+      padding: 6px 12px; border: 1px solid #ddd; background: #fff;
+      border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .fuel-toggle button.active { background: #1a73e8; color: white; border-color: #1a73e8; }
+
+    .gps-btn {
+      position: absolute; bottom: 24px; right: 16px; z-index: 10;
+      background: #fff; width: 46px; height: 46px; border-radius: 50%;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.2); border: none; font-size: 20px;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+
+    .custom-infowindow {
+      background: white; padding: 10px 14px; border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25); border: 1px solid #1a73e8;
+      font-size: 13px; min-width: 170px;
+    }
+    .info-title { font-weight: bold; margin-bottom: 4px; color: #222; }
+    .info-price { color: #d93025; font-weight: 700; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+  <div class="header-bar">
+    <div class="header-title">온누리 주유맵 ⛽</div>
+    <div class="fuel-toggle">
+      <button id="btn-gas" class="active" onclick="switchFuel('gasoline')">휘발유</button>
+      <button id="btn-diesel" onclick="switchFuel('diesel')">경유</button>
+    </div>
+  </div>
+
+  <button class="gps-btn" onclick="moveToCurrentLocation()" title="내 위치 이동">📍</button>
+  <div id="map"></div>
+
+  <script>
+    // 1단계에서 복사한 Apps Script 웹 앱 URL 입력
+    const APPS_SCRIPT_API_URL = "https://script.google.com/macros/s/AKfycbxS40AsAhGwKqwcquTnxUWMmWKfULb7FGE_5JIlLkwhyb9IBa2bNSZdYiKE9zuGs9cP/exec";
+    
+    let map, geocoder, currentFuel = "gasoline";
+    let stationList = [];
+    let markers = [];
+
+    const mapContainer = document.getElementById('map');
+    const mapOption = { center: new kakao.maps.LatLng(35.1595, 126.8526), level: 6 };
+    map = new kakao.maps.Map(mapContainer, mapOption);
+    geocoder = new kakao.maps.services.Geocoder();
+
+    async function loadStationData() {
+      try {
+        const res = await fetch(APPS_SCRIPT_API_URL);
+        stationList = await res.json();
+        renderMarkers();
+      } catch (err) {
+        console.error("데이터 로드 실패:", err);
+      }
+    }
+
+    function renderMarkers() {
+      markers.forEach(m => m.setMap(null));
+      markers = [];
+
+      stationList.forEach(station => {
+        if (!station.address) return;
+
+        geocoder.addressSearch(station.address, function(result, status) {
+          if (status === kakao.maps.services.Status.OK) {
+            const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+            const price = currentFuel === 'gasoline' ? station.gasoline : station.diesel;
+
+            const marker = new kakao.maps.Marker({
+              map: map,
+              position: coords
+            });
+
+            const content = `
+              <div class="custom-infowindow">
+                <div class="info-title">${station.name} (${station.brand})</div>
+                <div>${station.isSelf === '셀프' ? '⚡ 셀프' : '일반'}</div>
+                <div class="info-price">${currentFuel === 'gasoline' ? '휘발유' : '경유'}: ${Number(price).toLocaleString()}원</div>
+              </div>
+            `;
+
+            const infowindow = new kakao.maps.InfoWindow({
+              content: content,
+              removable: true
+            });
+
+            kakao.maps.event.addListener(marker, 'click', function() {
+              infowindow.open(map, marker);
+            });
+
+            markers.push(marker);
+          }
+        });
+      });
+    }
+
+    function switchFuel(type) {
+      currentFuel = type;
+      document.getElementById('btn-gas').classList.toggle('active', type === 'gasoline');
+      document.getElementById('btn-diesel').classList.toggle('active', type === 'diesel');
+      renderMarkers();
+    }
+
+    function moveToCurrentLocation() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          const locPosition = new kakao.maps.LatLng(lat, lon);
+          map.setCenter(locPosition);
+          map.setLevel(4);
+        });
+      } else {
+        alert("GPS 위치 정보를 사용할 수 없습니다.");
+      }
+    }
+
+    loadStationData();
+  </script>
+</body>
+</html>
