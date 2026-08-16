@@ -6,13 +6,13 @@
   <title>온누리상품권 주유맵</title>
   <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=c42d4b9380996995f8fabb3d2cdaaf8f&libraries=services"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body, html { width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background: #f8f9fa; }
     
     #app-container { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
     #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
 
-    /* 상단 유종 선택 */
+    /* 상단 헤더 */
     .top-header {
       position: absolute; top: 12px; left: 12px; right: 12px; z-index: 10;
       background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px);
@@ -27,54 +27,40 @@
     }
     .fuel-btn.active { background: #1a73e8; color: #fff; box-shadow: 0 2px 6px rgba(26,115,232,0.3); }
 
-    /* GPS 내 위치 플로팅 버튼 */
+    /* GPS 내 위치 버튼 */
     .gps-btn {
       position: absolute; right: 16px; bottom: 270px; z-index: 10;
-      background: #ffffff; width: 46px; height: 46px; border-radius: 50%;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.18); border: none; font-size: 20px;
+      background: #ffffff; width: 44px; height: 44px; border-radius: 50%;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2); border: none; font-size: 20px;
       display: flex; align-items: center; justify-content: center; cursor: pointer; transition: bottom 0.1s, transform 0.1s;
     }
     .gps-btn:active { transform: scale(0.92); }
 
-    /* 내 위치 파란 점 애니메이션 마커 */
-    .my-loc-dot {
-      width: 18px; height: 18px; background: #1a73e8; border: 3px solid #ffffff;
-      border-radius: 50%; box-shadow: 0 0 8px rgba(26,115,232,0.8); position: relative;
+    /* 1. 심플 미니 가격 뱃지 마커 */
+    .mini-price-badge {
+      background: #1a73e8; color: #ffffff; padding: 3px 6px; border-radius: 12px;
+      font-size: 11px; font-weight: 800; box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+      border: 1.5px solid #ffffff; cursor: pointer; white-space: nowrap; transition: transform 0.15s;
     }
-    .my-loc-pulse {
-      position: absolute; top: -7px; left: -7px; width: 26px; height: 26px;
-      border-radius: 50%; background: rgba(26,115,232,0.35); animation: pulse 1.8s infinite ease-out;
-    }
-    @keyframes pulse {
-      0% { transform: scale(0.7); opacity: 0.9; }
-      100% { transform: scale(2.2); opacity: 0; }
-    }
+    .mini-price-badge:hover { transform: scale(1.1); z-index: 15; }
+    .mini-price-badge.selected { background: #d93025; border-color: #ffebee; transform: scale(1.15); z-index: 20; }
 
-    /* 커스텀 가격 마커 라벨 */
-    .price-marker-label {
-      background: #1a73e8; color: white; padding: 5px 9px; border-radius: 14px;
-      font-size: 12px; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-      border: 1.5px solid #ffffff; position: relative; cursor: pointer; white-space: nowrap;
-    }
-    .price-marker-label::after {
-      content: ''; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%);
-      border-width: 5px 5px 0 5px; border-style: solid; border-color: #1a73e8 transparent transparent transparent;
-    }
-    .price-marker-label.selected { background: #d93025; }
-    .price-marker-label.selected::after { border-color: #d93025 transparent transparent transparent; }
-
-    /* 드래그 가능한 하단 바텀시트 */
+    /* 4. 드래그 가능한 바텀시트 */
     .bottom-sheet {
       position: absolute; bottom: 0; left: 0; right: 0; height: 250px; min-height: 120px; max-height: 85%;
       z-index: 10; background: #ffffff; border-radius: 20px 20px 0 0;
       box-shadow: 0 -4px 20px rgba(0,0,0,0.15); display: flex; flex-direction: column;
     }
-    .drag-handle-area { width: 100%; padding: 10px 0 6px 0; cursor: ns-resize; touch-action: none; display: flex; justify-content: center; }
-    .sheet-handle { width: 42px; height: 5px; background: #dcdfe6; border-radius: 3px; }
+    .drag-handle-area {
+      width: 100%; padding: 12px 0 8px 0; cursor: grab; touch-action: none;
+      display: flex; justify-content: center; user-select: none; -webkit-user-select: none;
+    }
+    .drag-handle-area:active { cursor: grabbing; }
+    .sheet-handle { width: 44px; height: 5px; background: #dcdfe6; border-radius: 3px; pointer-events: none; }
     
     .sort-bar {
       display: flex; gap: 6px; padding: 4px 14px 10px 14px; overflow-x: auto; border-bottom: 1px solid #f0f0f0;
-      scrollbar-width: none; flex-shrink: 0;
+      scrollbar-width: none; flex-shrink: 0; user-select: none;
     }
     .sort-bar::-webkit-scrollbar { display: none; }
     .sort-btn {
@@ -83,7 +69,7 @@
     }
     .sort-btn.active { background: #e8f0fe; color: #1a73e8; border-color: #1a73e8; }
 
-    .station-list { flex: 1; overflow-y: auto; padding: 8px 14px 20px 14px; -webkit-overflow-scrolling: touch; user-select: text; }
+    .station-list { flex: 1; overflow-y: auto; padding: 8px 14px 20px 14px; -webkit-overflow-scrolling: touch; }
     .station-card {
       padding: 12px; background: #ffffff; border: 1px solid #f1f3f4; border-radius: 12px;
       margin-bottom: 8px; cursor: pointer; transition: all 0.15s;
@@ -137,7 +123,7 @@
 
     let map, geocoder;
     let myLat = 35.1595, myLng = 126.8526; // 기본 중심좌표
-    let myLocationOverlay = null;
+    let myLocationMarker = null;
     let stationData = [];
     let activeCustomOverlays = [];
     let selectedFuel = 'gasoline';
@@ -149,7 +135,6 @@
     map = new kakao.maps.Map(mapContainer, mapOption);
     geocoder = new kakao.maps.services.Geocoder();
 
-    // 두 좌표 간 거리 계산 (km)
     function calcDistance(lat1, lon1, lat2, lon2) {
       const R = 6371;
       const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -169,23 +154,25 @@
         .trim();
     }
 
-    // 내 위치 파란 점 오버레이 표시
+    // 3. 내 위치 마커 표시 (표준 카카오 지도 마커 사용)
     function updateMyLocationMarker(lat, lng) {
-      if (myLocationOverlay) {
-        myLocationOverlay.setMap(null);
+      const locPosition = new kakao.maps.LatLng(lat, lng);
+      
+      if (!myLocationMarker) {
+        // 파란색 타깃 마커 생성
+        const imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png';
+        const imageSize = new kakao.maps.Size(24, 35);
+        const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize);
+
+        myLocationMarker = new kakao.maps.Marker({
+          map: map,
+          position: locPosition,
+          image: markerImage,
+          zIndex: 30
+        });
+      } else {
+        myLocationMarker.setPosition(locPosition);
       }
-      const markerContent = document.createElement('div');
-      markerContent.innerHTML = `
-        <div class="my-loc-dot">
-          <div class="my-loc-pulse"></div>
-        </div>
-      `;
-      myLocationOverlay = new kakao.maps.CustomOverlay({
-        position: new kakao.maps.LatLng(lat, lng),
-        content: markerContent,
-        zIndex: 20
-      });
-      myLocationOverlay.setMap(map);
     }
 
     // 데이터 초기 로딩
@@ -199,7 +186,6 @@
           return;
         }
 
-        // undefined 방어 정제
         stationData = list.map((st, idx) => ({
           id: st.id || `st_${idx}`,
           name: st.name || "주유소",
@@ -214,7 +200,6 @@
         updateDistances();
         renderStationList();
 
-        // 지오코딩 및 마커 생성
         stationData.forEach(item => {
           const searchAddr = cleanAddress(item.address);
           if (!searchAddr) return;
@@ -241,7 +226,6 @@
         }
       } catch (err) {
         console.error("로드 실패:", err);
-        document.getElementById('station-list').innerHTML = `<div style="text-align:center; padding:20px; color:red;">데이터를 가져오지 못했습니다.</div>`;
       }
     }
 
@@ -255,22 +239,26 @@
       });
     }
 
+    // 1 & 2. 미니 숫자 마커 생성 및 고급유 미판매 제외
     function createMarker(st) {
-      let price = selectedFuel === 'gasoline' ? st.gasoline : (selectedFuel === 'diesel' ? st.diesel : (st.premium || '-'));
-      if (!price || price === '0' || price === 0) price = '-';
-      else price = Number(price).toLocaleString() + '원';
+      let rawPrice = selectedFuel === 'gasoline' ? st.gasoline : (selectedFuel === 'diesel' ? st.diesel : st.premium);
+      const numPrice = Number(rawPrice);
+
+      // 2. 가격이 없거나 0원인 주유소는 지도 마커에서 제외 (고급유 등)
+      if (!numPrice || numPrice === 0) return;
 
       const isSelected = st.id === selectedStationId;
       const content = document.createElement('div');
-      content.className = `price-marker-label ${isSelected ? 'selected' : ''}`;
-      content.innerHTML = `${(st.name || '주유소').split(' ')[0]} <b>${price}</b>`;
+      content.className = `mini-price-badge ${isSelected ? 'selected' : ''}`;
+      content.innerHTML = `${numPrice.toLocaleString()}`;
 
       content.onclick = () => focusStation(st);
 
       const customOverlay = new kakao.maps.CustomOverlay({
         position: new kakao.maps.LatLng(st.lat, st.lng),
         content: content,
-        yAnchor: 1.2
+        yAnchor: 0.5,
+        zIndex: isSelected ? 20 : 10
       });
 
       customOverlay.setMap(map);
@@ -375,44 +363,53 @@
           updateMyLocationMarker(myLat, myLng);
           updateDistances();
           renderStationList();
-        }, () => alert("현재 위치를 가져올 수 없습니다. GPS 권한을 확인해주세요."));
+        }, () => alert("현재 위치를 가져올 수 없습니다. 브라우저 위치 권한을 확인해주세요."));
       }
     }
 
-    // 1. 바텀시트 드래그 리사이즈 구현
+    // 4. PC/모바일 겸용 바텀시트 드래그 리사이즈 로직
     const bottomSheet = document.getElementById('bottom-sheet');
     const dragHandle = document.getElementById('drag-handle');
     const gpsBtn = document.getElementById('gps-btn');
     let isDragging = false, startY = 0, startHeight = 0;
 
-    function startDrag(y) {
+    function startDrag(clientY) {
       isDragging = true;
-      startY = y;
+      startY = clientY;
       startHeight = bottomSheet.offsetHeight;
-      document.body.style.cursor = 'ns-resize';
+      document.body.style.userSelect = 'none';
     }
 
-    function onDrag(y) {
+    function onDrag(clientY) {
       if (!isDragging) return;
-      const deltaY = startY - y;
+      const deltaY = startY - clientY;
       const newHeight = Math.min(Math.max(startHeight + deltaY, 120), window.innerHeight * 0.85);
       bottomSheet.style.height = `${newHeight}px`;
       gpsBtn.style.bottom = `${newHeight + 20}px`;
     }
 
     function stopDrag() {
-      isDragging = false;
-      document.body.style.cursor = '';
+      if (isDragging) {
+        isDragging = false;
+        document.body.style.userSelect = '';
+      }
     }
 
-    // 마우스 이벤트
-    dragHandle.addEventListener('mousedown', (e) => startDrag(e.clientY));
+    // 마우스 이벤트 (PC)
+    dragHandle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      startDrag(e.clientY);
+    });
     window.addEventListener('mousemove', (e) => onDrag(e.clientY));
     window.addEventListener('mouseup', stopDrag);
 
-    // 모바일 터치 이벤트
-    dragHandle.addEventListener('touchstart', (e) => startDrag(e.touches[0].clientY), { passive: true });
-    window.addEventListener('touchmove', (e) => onDrag(e.touches[0].clientY), { passive: true });
+    // 터치 이벤트 (모바일)
+    dragHandle.addEventListener('touchstart', (e) => {
+      startDrag(e.touches[0].clientY);
+    }, { passive: true });
+    window.addEventListener('touchmove', (e) => {
+      onDrag(e.touches[0].clientY);
+    }, { passive: true });
     window.addEventListener('touchend', stopDrag);
 
     initData();
