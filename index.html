@@ -5,148 +5,110 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>온누리상품권 주유맵</title>
   
-  <!-- 사파리 상단 상태바 일체화 -->
   <meta name="theme-color" content="#ffffff">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
-  <!-- 파비콘 및 홈 화면 아이콘 -->
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="favicon.png">
 
-  <!-- 카카오맵 JavaScript SDK -->
   <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=c42d4b9380996995f8fabb3d2cdaaf8f&libraries=services"></script>
   
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     
     html, body {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      width: 100vw; height: 100vh; height: 100dvh;
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", sans-serif;
       background: #ffffff;
     }
     
-    #app-container {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-    }
-    
-    /* 1. 지도가 화면 최상단(노치/다이내믹 아일랜드)까지 100% 채움 */
-    #map {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 1;
-    }
+    #app-container { position: relative; width: 100%; height: 100%; overflow: hidden; }
+    #map { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; z-index: 1; }
 
     /* 상단 헤더 */
     .top-header {
-      position: absolute;
-      top: calc(8px + env(safe-area-inset-top));
-      left: 14px;
-      right: 14px;
-      z-index: 10;
-      background: rgba(255, 255, 255, 0.94);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      padding: 8px 12px;
-      border-radius: 16px;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.12);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      position: absolute; top: calc(8px + env(safe-area-inset-top)); left: 12px; right: 12px; z-index: 10;
+      background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      padding: 8px 12px; border-radius: 16px; box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+      display: flex; flex-direction: column; gap: 8px;
     }
-    .app-brand { display: flex; align-items: center; gap: 8px; }
-    .app-logo { width: 24px; height: 24px; border-radius: 6px; }
-    .app-title { font-size: 15px; font-weight: 800; color: #1a73e8; letter-spacing: -0.3px; }
+    .header-row-1 { display: flex; justify-content: space-between; align-items: center; }
+    .app-brand { display: flex; align-items: center; gap: 6px; }
+    .app-logo { width: 22px; height: 22px; border-radius: 5px; }
+    .app-title { font-size: 14px; font-weight: 800; color: #1a73e8; letter-spacing: -0.3px; }
 
-    .fuel-selector { display: flex; background: rgba(0,0,0,0.06); padding: 3px; border-radius: 10px; gap: 2px; }
+    /* 1. 기본가 vs 온누리가 토글 */
+    .price-mode-selector { display: flex; background: rgba(0,0,0,0.06); padding: 2px; border-radius: 8px; gap: 2px; }
+    .price-mode-btn {
+      padding: 4px 8px; border: none; background: transparent;
+      border-radius: 6px; font-size: 11px; font-weight: 700; color: #5f6368; cursor: pointer; transition: all 0.2s;
+    }
+    .price-mode-btn.active { background: #d93025; color: #fff; box-shadow: 0 2px 4px rgba(217,48,37,0.3); }
+
+    .header-row-2 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .fuel-selector { display: flex; background: rgba(0,0,0,0.06); padding: 2px; border-radius: 8px; gap: 2px; }
     .fuel-btn {
-      padding: 6px 11px; border: none; background: transparent;
-      border-radius: 8px; font-size: 12px; font-weight: 700; color: #5f6368; cursor: pointer; transition: all 0.2s;
+      padding: 5px 9px; border: none; background: transparent;
+      border-radius: 6px; font-size: 11px; font-weight: 700; color: #5f6368; cursor: pointer; transition: all 0.2s;
     }
-    .fuel-btn.active { background: #1a73e8; color: #fff; box-shadow: 0 2px 6px rgba(26,115,232,0.35); }
+    .fuel-btn.active { background: #1a73e8; color: #fff; }
 
-    /* GPS 내 위치 버튼 */
+    /* 3. 온누리 전용 필터 스위치 */
+    .filter-switch-wrap { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: #3c4043; }
+    .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #ccc; transition: .3s; border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
+      background-color: white; transition: .3s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: #1a73e8; }
+    input:checked + .slider:before { transform: translateX(14px); }
+
+    /* GPS 버튼 */
     .gps-btn {
-      position: absolute;
-      right: 16px;
-      bottom: 290px;
-      z-index: 10;
-      background: #ffffff;
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.18);
-      border: none;
-      font-size: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: bottom 0.1s, transform 0.1s;
+      position: absolute; right: 16px; bottom: 300px; z-index: 10;
+      background: #ffffff; width: 44px; height: 44px; border-radius: 50%;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.18); border: none; font-size: 20px;
+      display: flex; align-items: center; justify-content: center; cursor: pointer; transition: bottom 0.1s, transform 0.1s;
     }
     .gps-btn:active { transform: scale(0.92); }
 
     /* 미니 가격 마커 */
     .mini-price-badge {
-      background: #1a73e8; color: #ffffff; padding: 3px 7px; border-radius: 12px;
-      font-size: 11px; font-weight: 800; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+      padding: 3px 6px; border-radius: 12px;
+      font-size: 11px; font-weight: 800; box-shadow: 0 2px 5px rgba(0,0,0,0.25);
       border: 1.5px solid #ffffff; cursor: pointer; white-space: nowrap; transition: transform 0.15s;
     }
-    .mini-price-badge:hover { transform: scale(1.1); z-index: 15; }
-    .mini-price-badge.selected { background: #d93025; border-color: #ffebee; transform: scale(1.15); z-index: 20; }
+    /* 온누리 가맹점 마커 (강조) */
+    .mini-price-badge.onnuri { background: #1a73e8; color: #ffffff; }
+    .mini-price-badge.onnuri::before { content: "온 "; color: #ffe082; font-size: 9px; font-weight: 900; }
+    /* 일반 주유소 마커 (회색) */
+    .mini-price-badge.regular { background: #757575; color: #ffffff; }
+    .mini-price-badge.selected { background: #d93025 !important; border-color: #ffebee; transform: scale(1.15); z-index: 20; }
 
-    /* 2. 하단 바텀시트 구조 최적화 */
+    /* 하단 바텀시트 */
     .bottom-sheet {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 280px;
-      min-height: 140px;
-      max-height: 85%;
-      z-index: 10;
-      background: #ffffff;
-      border-radius: 22px 22px 0 0;
-      box-shadow: 0 -6px 24px rgba(0,0,0,0.12);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
+      position: absolute; bottom: 0; left: 0; right: 0; height: 280px; min-height: 140px; max-height: 85%;
+      z-index: 10; background: #ffffff; border-radius: 22px 22px 0 0;
+      box-shadow: 0 -6px 24px rgba(0,0,0,0.12); display: flex; flex-direction: column; overflow: hidden;
     }
-    
     .drag-handle-area {
-      width: 100%;
-      padding: 10px 0 6px 0;
-      cursor: grab;
-      touch-action: none;
-      display: flex;
-      justify-content: center;
-      user-select: none;
-      background: #ffffff;
-      flex-shrink: 0;
+      width: 100%; padding: 10px 0 6px 0; cursor: grab; touch-action: none;
+      display: flex; justify-content: center; user-select: none; background: #ffffff; flex-shrink: 0;
     }
     .drag-handle-area:active { cursor: grabbing; }
     .sheet-handle { width: 42px; height: 4px; background: #dcdfe6; border-radius: 3px; pointer-events: none; }
     
     .sort-bar {
       display: flex; gap: 6px; padding: 4px 14px 10px 14px; overflow-x: auto;
-      border-bottom: 1px solid #f0f0f0; background: #ffffff;
-      scrollbar-width: none; flex-shrink: 0; user-select: none;
+      border-bottom: 1px solid #f0f0f0; background: #ffffff; scrollbar-width: none; flex-shrink: 0; user-select: none;
     }
     .sort-bar::-webkit-scrollbar { display: none; }
     .sort-btn {
@@ -155,13 +117,10 @@
     }
     .sort-btn.active { background: #e8f0fe; color: #1a73e8; border-color: #1a73e8; }
 
-    /* 목록: 상단 잘림 방지 및 하단 안전 여백 */
     .station-list {
-      flex: 1;
-      overflow-y: auto;
+      flex: 1; overflow-y: auto;
       padding: 12px 14px calc(70px + env(safe-area-inset-bottom)) 14px;
-      -webkit-overflow-scrolling: touch;
-      background: #ffffff;
+      -webkit-overflow-scrolling: touch; background: #ffffff;
     }
 
     .station-card {
@@ -170,9 +129,12 @@
     }
     .station-card:hover, .station-card:active { background: #f8fafd; border-color: #d2e3fc; }
     
-    .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .card-name-wrap { display: flex; align-items: center; gap: 6px; }
+    .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .card-name-wrap { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
     .card-name { font-size: 14px; font-weight: 700; color: #202124; letter-spacing: -0.2px; }
+    
+    .onnuri-tag { font-size: 10px; font-weight: 800; color: #ffffff; background: #1a73e8; padding: 1px 5px; border-radius: 4px; }
+    .discount-tag { font-size: 10px; font-weight: 800; color: #d93025; background: #fce8e6; padding: 1px 5px; border-radius: 4px; }
     .self-tag { font-size: 10px; font-weight: 700; color: #0d904f; background: #e6f4ea; padding: 1px 4px; border-radius: 4px; }
     .card-dist { font-size: 12px; font-weight: 700; color: #1a73e8; background: #e8f0fe; padding: 2px 7px; border-radius: 6px; }
     
@@ -187,21 +149,41 @@
 <body>
 
   <div id="app-container">
+    <!-- 상단 2단 헤더 -->
     <div class="top-header">
-      <div class="app-brand">
-        <img src="favicon.png" alt="logo" class="app-logo" onerror="this.style.display='none'">
-        <div class="app-title">온누리 주유맵</div>
+      <div class="header-row-1">
+        <div class="app-brand">
+          <img src="favicon.png" alt="logo" class="app-logo" onerror="this.style.display='none'">
+          <div class="app-title">온누리 주유맵</div>
+        </div>
+        <!-- 1. 기본가 vs 온누리 7% 할인가 모드 -->
+        <div class="price-mode-selector">
+          <button class="price-mode-btn active" id="mode-normal" onclick="setPriceMode('normal')">기본 가격</button>
+          <button class="price-mode-btn" id="mode-onnuri" onclick="setPriceMode('onnuri')">온누리 7% 할인가</button>
+        </div>
       </div>
-      <div class="fuel-selector">
-        <button class="fuel-btn active" onclick="setFuelType('gasoline')">휘발유</button>
-        <button class="fuel-btn" onclick="setFuelType('diesel')">경유</button>
-        <button class="fuel-btn" onclick="setFuelType('premium')">고급유</button>
+      
+      <div class="header-row-2">
+        <div class="fuel-selector">
+          <button class="fuel-btn active" onclick="setFuelType('gasoline')">휘발유</button>
+          <button class="fuel-btn" onclick="setFuelType('diesel')">경유</button>
+          <button class="fuel-btn" onclick="setFuelType('premium')">고급유</button>
+        </div>
+        <!-- 3. 온누리 가맹점만 보기 스위치 -->
+        <div class="filter-switch-wrap">
+          <span>온누리만</span>
+          <label class="switch">
+            <input type="checkbox" id="onnuri-only-toggle" onchange="toggleOnnuriOnly(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
       </div>
     </div>
 
     <button class="gps-btn" id="gps-btn" onclick="moveToCurrentLocation()" title="내 위치 이동">📍</button>
     <div id="map"></div>
 
+    <!-- 하단 목록 바텀시트 -->
     <div class="bottom-sheet" id="bottom-sheet">
       <div class="drag-handle-area" id="drag-handle">
         <div class="sheet-handle"></div>
@@ -225,10 +207,12 @@
     let map, geocoder;
     let myLat = 35.1595, myLng = 126.8526;
     let myLocationMarker = null;
-    let stationData = [];
+    let rawStationData = [];
     let activeCustomOverlays = [];
     let selectedFuel = 'gasoline';
     let currentSort = 'gasoline';
+    let priceMode = 'normal'; // 'normal' 또는 'onnuri' (7% 할인 계산)
+    let isOnnuriOnly = false; // 온누리 가맹점만 보기 여부
     let selectedStationId = null;
 
     const mapContainer = document.getElementById('map');
@@ -255,6 +239,16 @@
         .trim();
     }
 
+    // 유종 및 모드(기본가 vs 7% 온누리가)에 따른 실효 가격 계산 함수
+    function getEffectivePrice(st, fuelType) {
+      let base = Number(st[fuelType]) || 0;
+      if (base === 0) return 0;
+      if (priceMode === 'onnuri' && st.isOnnuri) {
+        return Math.round(base * 0.93); // 온누리 상품권 7% 할인 체감가
+      }
+      return base;
+    }
+
     function updateMyLocationMarker(lat, lng) {
       const locPosition = new kakao.maps.LatLng(lat, lng);
       if (!myLocationMarker) {
@@ -279,19 +273,20 @@
         const list = await res.json();
         
         if (!list || list.length === 0) {
-          document.getElementById('station-list').innerHTML = `<div style="text-align:center; padding:20px; color:#888;">온누리 주유소 데이터가 없습니다.</div>`;
+          document.getElementById('station-list').innerHTML = `<div style="text-align:center; padding:20px; color:#888;">주유소 데이터가 없습니다.</div>`;
           return;
         }
 
-        stationData = list.map((st, idx) => ({
+        rawStationData = list.map((st, idx) => ({
           id: st.id || `st_${idx}`,
           name: st.name || "주유소",
           brand: st.brand || "",
           address: st.address || "",
-          gasoline: st.gasoline || "",
-          diesel: st.diesel || "",
-          premium: st.premium || "",
+          gasoline: Number(st.gasoline) || 0,
+          diesel: Number(st.diesel) || 0,
+          premium: Number(st.premium) || 0,
           isSelf: st.isSelf || "",
+          isOnnuri: !!st.isOnnuri,
           lat: null,
           lng: null,
           distance: 9999
@@ -311,7 +306,7 @@
         renderStationList();
 
         let geocodeCount = 0;
-        stationData.forEach(item => {
+        rawStationData.forEach(item => {
           const searchAddr = cleanAddress(item.address);
           if (!searchAddr) return;
 
@@ -323,7 +318,7 @@
               createMarker(item);
             }
             geocodeCount++;
-            if (geocodeCount % 5 === 0 || geocodeCount === stationData.length) {
+            if (geocodeCount % 5 === 0 || geocodeCount === rawStationData.length) {
               renderStationList();
             }
           });
@@ -334,22 +329,29 @@
     }
 
     function updateDistances() {
-      stationData.forEach(st => {
+      rawStationData.forEach(st => {
         if (st.lat && st.lng) {
           st.distance = calcDistance(myLat, myLng, st.lat, st.lng);
         }
       });
     }
 
-    function createMarker(st) {
-      let rawPrice = selectedFuel === 'gasoline' ? st.gasoline : (selectedFuel === 'diesel' ? st.diesel : st.premium);
-      const numPrice = Number(rawPrice);
+    function getFilteredStations() {
+      if (isOnnuriOnly) {
+        return rawStationData.filter(st => st.isOnnuri);
+      }
+      return rawStationData;
+    }
 
+    function createMarker(st) {
+      if (isOnnuriOnly && !st.isOnnuri) return;
+
+      const numPrice = getEffectivePrice(st, selectedFuel);
       if (!numPrice || numPrice === 0) return;
 
       const isSelected = st.id === selectedStationId;
       const content = document.createElement('div');
-      content.className = `mini-price-badge ${isSelected ? 'selected' : ''}`;
+      content.className = `mini-price-badge ${st.isOnnuri ? 'onnuri' : 'regular'} ${isSelected ? 'selected' : ''}`;
       content.innerHTML = `${numPrice.toLocaleString()}`;
 
       content.onclick = () => focusStation(st);
@@ -358,7 +360,7 @@
         position: new kakao.maps.LatLng(st.lat, st.lng),
         content: content,
         yAnchor: 0.5,
-        zIndex: isSelected ? 20 : 10
+        zIndex: isSelected ? 20 : (st.isOnnuri ? 15 : 10)
       });
 
       customOverlay.setMap(map);
@@ -368,35 +370,42 @@
     function renderMapMarkers() {
       activeCustomOverlays.forEach(overlay => overlay.setMap(null));
       activeCustomOverlays = [];
-      stationData.forEach(st => {
+      const list = getFilteredStations();
+      list.forEach(st => {
         if (st.lat && st.lng) createMarker(st);
       });
     }
 
     function renderStationList() {
       const listEl = document.getElementById('station-list');
-      let sorted = [...stationData];
+      let sorted = [...getFilteredStations()];
 
       if (currentSort === 'gasoline') {
-        sorted.sort((a, b) => (Number(a.gasoline) || 99999) - (Number(b.gasoline) || 99999));
+        sorted.sort((a, b) => (getEffectivePrice(a, 'gasoline') || 99999) - (getEffectivePrice(b, 'gasoline') || 99999));
       } else if (currentSort === 'diesel') {
-        sorted.sort((a, b) => (Number(a.diesel) || 99999) - (Number(b.diesel) || 99999));
+        sorted.sort((a, b) => (getEffectivePrice(a, 'diesel') || 99999) - (getEffectivePrice(b, 'diesel') || 99999));
       } else if (currentSort === 'premium') {
-        sorted.sort((a, b) => (Number(a.premium) || 99999) - (Number(b.premium) || 99999));
+        sorted.sort((a, b) => (getEffectivePrice(a, 'premium') || 99999) - (getEffectivePrice(b, 'premium') || 99999));
       } else if (currentSort === 'distance') {
         sorted.sort((a, b) => a.distance - b.distance);
       }
 
       if (sorted.length === 0) {
-        listEl.innerHTML = `<div style="text-align:center; padding:20px; color:#888;">표시할 주유소가 없습니다.</div>`;
+        listEl.innerHTML = `<div style="text-align:center; padding:20px; color:#888;">조건에 맞는 주유소가 없습니다.</div>`;
         return;
       }
 
       listEl.innerHTML = sorted.map(st => {
         const distStr = (st.distance && st.distance < 1000) ? `${st.distance.toFixed(1)}km` : '';
-        const gasStr = (st.gasoline && st.gasoline != 0) ? `${Number(st.gasoline).toLocaleString()}원` : '-';
-        const dieselStr = (st.diesel && st.diesel != 0) ? `${Number(st.diesel).toLocaleString()}원` : '-';
-        const premStr = (st.premium && st.premium != 0) ? `${Number(st.premium).toLocaleString()}원` : '-';
+        
+        const gasEff = getEffectivePrice(st, 'gasoline');
+        const dieselEff = getEffectivePrice(st, 'diesel');
+        const premEff = getEffectivePrice(st, 'premium');
+
+        const gasStr = gasEff > 0 ? `${gasEff.toLocaleString()}원` : '-';
+        const dieselStr = dieselEff > 0 ? `${dieselEff.toLocaleString()}원` : '-';
+        const premStr = premEff > 0 ? `${premEff.toLocaleString()}원` : '-';
+        
         const isSelf = st.isSelf === '셀프';
 
         return `
@@ -404,6 +413,8 @@
             <div class="card-top">
               <div class="card-name-wrap">
                 <span class="card-name">${st.name}</span>
+                ${st.isOnnuri ? '<span class="onnuri-tag">온누리</span>' : ''}
+                ${(priceMode === 'onnuri' && st.isOnnuri) ? '<span class="discount-tag">-7% 적용</span>' : ''}
                 ${isSelf ? '<span class="self-tag">셀프</span>' : ''}
                 <small style="color:#80868b; font-size:11px;">${st.brand || ''}</small>
               </div>
@@ -429,7 +440,7 @@
     }
 
     function focusStationById(id) {
-      const st = stationData.find(item => item.id === id);
+      const st = rawStationData.find(item => item.id === id);
       if (st) focusStation(st);
     }
 
@@ -440,6 +451,22 @@
         map.panTo(new kakao.maps.LatLng(st.lat, st.lng));
       }
       renderMapMarkers();
+    }
+
+    // 가격 모드 변경 (기본가 vs 7% 온누리가)
+    function setPriceMode(mode) {
+      priceMode = mode;
+      document.querySelectorAll('.price-mode-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`mode-${mode}`).classList.add('active');
+      renderMapMarkers();
+      renderStationList();
+    }
+
+    // 온누리만 보기 스위치 토글
+    function toggleOnnuriOnly(checked) {
+      isOnnuriOnly = checked;
+      renderMapMarkers();
+      renderStationList();
     }
 
     function setFuelType(fuel) {
