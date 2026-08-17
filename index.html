@@ -514,7 +514,7 @@
       // 현재 화면 영역 안의 주유소 필터링
       let candidate = getFilteredStations().filter(st => {
         if (!st.lat || !st.lng) return false;
-        return bounds.contain(new kakao.maps.LatLng(st.lat, st.lng));
+        return st.distance <= 15 (new kakao.maps.LatLng(st.lat, st.lng));
       });
 
       // 만약 화면 영역에 잡힌 게 없으면 전체 변환된 주유소 중 거리순 노출
