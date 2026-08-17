@@ -213,7 +213,7 @@
       </div>
     </div>
 
-    <!-- 이 지역 재검색 플로팅 버튼 -->
+    <!-- 이 지역 재검색 수동 제어 버튼 -->
     <button class="redo-search-btn" id="redo-btn" onclick="searchCurrentMapArea()">🔄 이 지역 재검색</button>
 
     <button class="gps-btn" id="gps-btn" onclick="moveToCurrentLocation()" title="내 위치 이동">📍</button>
@@ -247,12 +247,11 @@
     let selectedFuel = 'gasoline';
     let currentSort = 'gasoline';
     let priceMode = 'normal';
-    let isOnnuriOnly = false; // 기본값: 전체 주유소 표기 (온누리 필터 옵션)
+    let isOnnuriOnly = false;
     let selectedStationId = null;
     let displayLimit = 50;
 
-    // 로컬스토리지 영구 캐시
-    const CACHE_KEY = "kakao_geo_cache_v3";
+    const CACHE_KEY = "kakao_geo_cache_v5";
     let persistentCache = {};
     try {
       persistentCache = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
@@ -317,7 +316,6 @@
       }
     }
 
-    // 1. 초기 데이터 수집 및 온누리 전체 사전 지오코딩
     async function initData() {
       try {
         const res = await fetch(APPS_SCRIPT_API_URL);
@@ -348,14 +346,9 @@
           };
         });
 
-        // 1차 캐시 렌더링
         renderMapMarkers();
         renderStationList();
 
-        // 2차 온누리 가맹점 전체(전국 96개) 우선 지오코딩
-        geocodeOnnuriStations();
-
-        // 3차 현재 GPS 위치 수신 및 화면 영역 지오코딩
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(pos => {
             myLat = pos.coords.latitude;
@@ -363,34 +356,16 @@
             map.setCenter(new kakao.maps.LatLng(myLat, myLng));
             updateMyLocationMarker(myLat, myLng);
             updateDistances();
-            geocodeCurrentArea();
+            processTargetGeocoding(true);
           }, () => {
-            geocodeCurrentArea();
+            processTargetGeocoding(true);
           });
         } else {
-          geocodeCurrentArea();
+          processTargetGeocoding(true);
         }
       } catch (err) {
         console.error("로드 실패:", err);
       }
-    }
-
-    // 온누리 가맹점은 전국 어디에 있든 100% 좌표 확보
-    function geocodeOnnuriStations() {
-      const onnuriQueue = rawStationData.filter(st => st.isOnnuri && st.lat === null);
-      onnuriQueue.forEach(item => {
-        if (!item.cleanAddr) return;
-        geocoder.addressSearch(item.cleanAddr, (result, status) => {
-          if (status === kakao.maps.services.Status.OK) {
-            item.lat = parseFloat(result[0].y);
-            item.lng = parseFloat(result[0].x);
-            item.distance = calcDistance(myLat, myLng, item.lat, item.lng);
-            saveCache(item.cleanAddr, item.lat, item.lng);
-            renderMapMarkers();
-            renderStationList();
-          }
-        });
-      });
     }
 
     function updateDistances() {
@@ -401,49 +376,83 @@
       });
     }
 
-    // 2. 현재 화면 중심 기준 행정구역 실시간 감지 및 지오코딩
-    function geocodeCurrentArea() {
+    // 대상 지역 선별 순차 지오코딩 큐
+    let isGeocoding = false;
+    function processTargetGeocoding(isInitial = false) {
+      if (isGeocoding) return;
+
       const center = map.getCenter();
-      
-      // 카카오 좌표 -> 행정구역명 실시간 변환
       geocoder.coord2RegionCode(center.getLng(), center.getLat(), (result, status) => {
+        let region1 = "광주", region2 = "";
         if (status === kakao.maps.services.Status.OK && result.length > 0) {
-          const region = result[0];
-          const region1 = region.region_1depth_name; // 예: 광주광역시, 전라남도
-          const region2 = region.region_2depth_name; // 예: 남구, 목포시, 순천시
+          region1 = result[0].region_1depth_name.substring(0, 2);
+          region2 = result[0].region_2depth_name || "";
+        }
 
-          // 현재 보고 있는 지역 주유소 매칭
-          const matchedStations = rawStationData.filter(st => {
-            if (st.lat !== null) return false; // 이미 변환된 것은 제외
-            if (region2 && st.cleanAddr.includes(region2)) return true;
-            if (region1 && st.cleanAddr.includes(region1.substring(0, 2))) return true;
-            return false;
-          }).slice(0, 40); // 40개 일괄 변환
+        // 온누리 가맹점 + 현재 화면 중심 지역 주유소 선별 (최대 50개)
+        const queue = rawStationData.filter(st => {
+          if (st.lat !== null) return false;
+          if (st.isOnnuri) return true;
+          if (region2 && st.cleanAddr.includes(region2)) return true;
+          if (region1 && st.cleanAddr.includes(region1)) return true;
+          return false;
+        }).slice(0, 50);
 
-          let done = 0;
-          if (matchedStations.length === 0) {
+        if (queue.length === 0) {
+          renderMapMarkers();
+          renderStationList();
+          return;
+        }
+
+        isGeocoding = true;
+        let index = 0;
+
+        function processNext() {
+          if (index >= queue.length) {
+            isGeocoding = false;
+            updateDistances();
             renderMapMarkers();
             renderStationList();
             return;
           }
 
-          matchedStations.forEach(item => {
-            geocoder.addressSearch(item.cleanAddr, (res, stat) => {
-              if (stat === kakao.maps.services.Status.OK) {
-                item.lat = parseFloat(res[0].y);
-                item.lng = parseFloat(res[0].x);
-                item.distance = calcDistance(myLat, myLng, item.lat, item.lng);
-                saveCache(item.cleanAddr, item.lat, item.lng);
-              }
-              done++;
-              if (done === matchedStations.length) {
-                renderMapMarkers();
-                renderStationList();
-              }
-            });
+          const item = queue[index++];
+          if (!item.cleanAddr) {
+            processNext();
+            return;
+          }
+
+          geocoder.addressSearch(item.cleanAddr, (res, stat) => {
+            if (stat === kakao.maps.services.Status.OK) {
+              item.lat = parseFloat(res[0].y);
+              item.lng = parseFloat(res[0].x);
+              item.distance = calcDistance(myLat, myLng, item.lat, item.lng);
+              saveCache(item.cleanAddr, item.lat, item.lng);
+            }
+            setTimeout(processNext, 30);
           });
         }
+
+        processNext();
       });
+    }
+
+    // 지도 이동 및 축소/확대 시 자동 검색을 막고 버튼 표시
+    const redoBtn = document.getElementById('redo-btn');
+    kakao.maps.event.addListener(map, 'dragend', () => {
+      redoBtn.classList.add('show');
+    });
+    kakao.maps.event.addListener(map, 'zoom_changed', () => {
+      redoBtn.classList.add('show');
+      renderMapMarkers();
+      renderStationList();
+    });
+
+    // 이 지역 재검색 버튼 클릭 시에만 해당 영역 정밀 탐색 실행
+    function searchCurrentMapArea() {
+      redoBtn.classList.remove('show');
+      displayLimit = 50;
+      processTargetGeocoding(false);
     }
 
     function getFilteredStations() {
@@ -495,29 +504,18 @@
       });
     }
 
-    const redoBtn = document.getElementById('redo-btn');
-    kakao.maps.event.addListener(map, 'dragend', () => {
-      redoBtn.classList.add('show');
-    });
-
-    // 이 지역 재검색 클릭
-    function searchCurrentMapArea() {
-      redoBtn.classList.remove('show');
-      displayLimit = 50;
-      geocodeCurrentArea();
-    }
-
     function renderStationList() {
       const listEl = document.getElementById('station-list');
       const bounds = map.getBounds();
       
-      // 현재 화면 영역 안의 주유소 필터링
+      // 화면 안 또는 15km 이내 주유소 전체 포함
       let candidate = getFilteredStations().filter(st => {
         if (!st.lat || !st.lng) return false;
-        return st.distance <= 15 (new kakao.maps.LatLng(st.lat, st.lng));
+        const inBounds = bounds.contain(new kakao.maps.LatLng(st.lat, st.lng));
+        const within15km = st.distance <= 15;
+        return inBounds || within15km;
       });
 
-      // 만약 화면 영역에 잡힌 게 없으면 전체 변환된 주유소 중 거리순 노출
       if (candidate.length === 0) {
         candidate = getFilteredStations();
       }
@@ -654,12 +652,12 @@
           redoBtn.classList.remove('show');
           displayLimit = 50;
           updateDistances();
-          geocodeCurrentArea();
+          processTargetGeocoding(false);
         }, () => alert("현재 위치를 가져올 수 없습니다. 브라우저 위치 권한을 확인해주세요."));
       }
     }
 
-    // 바텀시트 제스처
+    // 바텀시트 터치 제스처
     const bottomSheet = document.getElementById('bottom-sheet');
     const dragHandle = document.getElementById('drag-handle');
     const gpsBtn = document.getElementById('gps-btn');
