@@ -30,7 +30,7 @@
 
     /* 상단 헤더 */
     .top-header {
-      position: absolute; top: calc(8px + env(safe-area-inset-top)); left: 12px; right: 12px; z-index: 10;
+      position: absolute; top: calc(12px + env(safe-area-inset-top)); left: 14px; right: 14px; z-index: 10;
       background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
       padding: 8px 12px; border-radius: 16px; box-shadow: 0 4px 18px rgba(0,0,0,0.12);
       display: flex; flex-direction: column; gap: 8px;
@@ -40,7 +40,6 @@
     .app-logo { width: 22px; height: 22px; border-radius: 5px; }
     .app-title { font-size: 14px; font-weight: 800; color: #1a73e8; letter-spacing: -0.3px; }
 
-    /* 1. 기본가 vs 온누리가 토글 */
     .price-mode-selector { display: flex; background: rgba(0,0,0,0.06); padding: 2px; border-radius: 8px; gap: 2px; }
     .price-mode-btn {
       padding: 4px 8px; border: none; background: transparent;
@@ -56,7 +55,6 @@
     }
     .fuel-btn.active { background: #1a73e8; color: #fff; }
 
-    /* 3. 온누리 전용 필터 스위치 */
     .filter-switch-wrap { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: #3c4043; }
     .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
     .switch input { opacity: 0; width: 0; height: 0; }
@@ -86,19 +84,20 @@
       font-size: 11px; font-weight: 800; box-shadow: 0 2px 5px rgba(0,0,0,0.25);
       border: 1.5px solid #ffffff; cursor: pointer; white-space: nowrap; transition: transform 0.15s;
     }
-    /* 온누리 가맹점 마커 (강조) */
     .mini-price-badge.onnuri { background: #1a73e8; color: #ffffff; }
     .mini-price-badge.onnuri::before { content: "온 "; color: #ffe082; font-size: 9px; font-weight: 900; }
-    /* 일반 주유소 마커 (회색) */
     .mini-price-badge.regular { background: #757575; color: #ffffff; }
     .mini-price-badge.selected { background: #d93025 !important; border-color: #ffebee; transform: scale(1.15); z-index: 20; }
 
     /* 하단 바텀시트 */
     .bottom-sheet {
-      position: absolute; bottom: 0; left: 0; right: 0; height: 280px; min-height: 140px; max-height: 85%;
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 280px; min-height: 140px; max-height: 85%;
       z-index: 10; background: #ffffff; border-radius: 22px 22px 0 0;
       box-shadow: 0 -6px 24px rgba(0,0,0,0.12); display: flex; flex-direction: column; overflow: hidden;
+      padding-bottom: env(safe-area-inset-bottom);
     }
+    
     .drag-handle-area {
       width: 100%; padding: 10px 0 6px 0; cursor: grab; touch-action: none;
       display: flex; justify-content: center; user-select: none; background: #ffffff; flex-shrink: 0;
@@ -119,7 +118,7 @@
 
     .station-list {
       flex: 1; overflow-y: auto;
-      padding: 12px 14px calc(70px + env(safe-area-inset-bottom)) 14px;
+      padding: 12px 14px calc(24px + env(safe-area-inset-bottom)) 14px;
       -webkit-overflow-scrolling: touch; background: #ffffff;
     }
 
@@ -149,14 +148,12 @@
 <body>
 
   <div id="app-container">
-    <!-- 상단 2단 헤더 -->
     <div class="top-header">
       <div class="header-row-1">
         <div class="app-brand">
           <img src="favicon.png" alt="logo" class="app-logo" onerror="this.style.display='none'">
           <div class="app-title">온누리 주유맵</div>
         </div>
-        <!-- 1. 기본가 vs 온누리 7% 할인가 모드 -->
         <div class="price-mode-selector">
           <button class="price-mode-btn active" id="mode-normal" onclick="setPriceMode('normal')">기본 가격</button>
           <button class="price-mode-btn" id="mode-onnuri" onclick="setPriceMode('onnuri')">온누리 7% 할인가</button>
@@ -169,7 +166,6 @@
           <button class="fuel-btn" onclick="setFuelType('diesel')">경유</button>
           <button class="fuel-btn" onclick="setFuelType('premium')">고급유</button>
         </div>
-        <!-- 3. 온누리 가맹점만 보기 스위치 -->
         <div class="filter-switch-wrap">
           <span>온누리만</span>
           <label class="switch">
@@ -183,7 +179,6 @@
     <button class="gps-btn" id="gps-btn" onclick="moveToCurrentLocation()" title="내 위치 이동">📍</button>
     <div id="map"></div>
 
-    <!-- 하단 목록 바텀시트 -->
     <div class="bottom-sheet" id="bottom-sheet">
       <div class="drag-handle-area" id="drag-handle">
         <div class="sheet-handle"></div>
@@ -196,7 +191,7 @@
       </div>
       
       <div class="station-list" id="station-list">
-        <div style="text-align:center; padding: 24px; color:#888; font-size:13px;">주유소 데이터를 불러오는 중...</div>
+        <div style="text-align:center; padding: 24px; color:#888; font-size:13px;">주변 주유소 탐색 중...</div>
       </div>
     </div>
   </div>
@@ -205,15 +200,18 @@
     const APPS_SCRIPT_API_URL = "https://script.google.com/macros/s/AKfycbxS40AsAhGwKqwcquTnxUWMmWKfULb7FGE_5JIlLkwhyb9IBa2bNSZdYiKE9zuGs9cP/exec";
 
     let map, geocoder;
-    let myLat = 35.1595, myLng = 126.8526;
+    let myLat = 35.1595, myLng = 126.8526; // 기본 광주
     let myLocationMarker = null;
     let rawStationData = [];
     let activeCustomOverlays = [];
     let selectedFuel = 'gasoline';
     let currentSort = 'gasoline';
-    let priceMode = 'normal'; // 'normal' 또는 'onnuri' (7% 할인 계산)
-    let isOnnuriOnly = false; // 온누리 가맹점만 보기 여부
+    let priceMode = 'normal';
+    let isOnnuriOnly = false;
     let selectedStationId = null;
+
+    // 지오코딩 캐시 (동일 주소 재요청 방지)
+    const geocodeCache = new Map();
 
     const mapContainer = document.getElementById('map');
     const mapOption = { center: new kakao.maps.LatLng(myLat, myLng), level: 5 };
@@ -239,12 +237,11 @@
         .trim();
     }
 
-    // 유종 및 모드(기본가 vs 7% 온누리가)에 따른 실효 가격 계산 함수
     function getEffectivePrice(st, fuelType) {
       let base = Number(st[fuelType]) || 0;
       if (base === 0) return 0;
       if (priceMode === 'onnuri' && st.isOnnuri) {
-        return Math.round(base * 0.93); // 온누리 상품권 7% 할인 체감가
+        return Math.round(base * 0.93);
       }
       return base;
     }
@@ -267,6 +264,7 @@
       }
     }
 
+    // 1. 데이터 로드 및 온누리 우선/인접 지역 1차 필터링
     async function initData() {
       try {
         const res = await fetch(APPS_SCRIPT_API_URL);
@@ -298,49 +296,86 @@
             myLng = pos.coords.longitude;
             map.setCenter(new kakao.maps.LatLng(myLat, myLng));
             updateMyLocationMarker(myLat, myLng);
-            updateDistances();
-            renderStationList();
+            processNearbyGeocoding();
+          }, () => {
+            processNearbyGeocoding();
           });
+        } else {
+          processNearbyGeocoding();
         }
-
-        renderStationList();
-
-        let geocodeCount = 0;
-        rawStationData.forEach(item => {
-          const searchAddr = cleanAddress(item.address);
-          if (!searchAddr) return;
-
-          geocoder.addressSearch(searchAddr, (result, status) => {
-            if (status === kakao.maps.services.Status.OK) {
-              item.lat = parseFloat(result[0].y);
-              item.lng = parseFloat(result[0].x);
-              item.distance = calcDistance(myLat, myLng, item.lat, item.lng);
-              createMarker(item);
-            }
-            geocodeCount++;
-            if (geocodeCount % 5 === 0 || geocodeCount === rawStationData.length) {
-              renderStationList();
-            }
-          });
-        });
       } catch (err) {
         console.error("로드 실패:", err);
       }
     }
 
-    function updateDistances() {
-      rawStationData.forEach(st => {
-        if (st.lat && st.lng) {
-          st.distance = calcDistance(myLat, myLng, st.lat, st.lng);
-        }
+    // 2. 온누리 가맹점 + 내 주변 주유소 우선 순차 지오코딩 (API 쿼터 보호)
+    function processNearbyGeocoding() {
+      // 온누리 가맹점을 최우선으로 변환하고, 광주/인근 지역 주유소만 선별
+      const targetStations = rawStationData.filter(st => {
+        if (st.isOnnuri) return true;
+        // 광주/전남 인근 지역 주소 우선 변환
+        return st.address.includes("광주") || st.address.includes("나주") || st.address.includes("담양") || st.address.includes("화순");
       });
+
+      let queueIndex = 0;
+      function nextGeocodeBatch() {
+        const batch = targetStations.slice(queueIndex, queueIndex + 15);
+        if (batch.length === 0) {
+          renderStationList();
+          renderMapMarkers();
+          return;
+        }
+
+        let completed = 0;
+        batch.forEach(item => {
+          const searchAddr = cleanAddress(item.address);
+          if (!searchAddr) {
+            completed++;
+            return;
+          }
+
+          if (geocodeCache.has(searchAddr)) {
+            const loc = geocodeCache.get(searchAddr);
+            item.lat = loc.lat;
+            item.lng = loc.lng;
+            item.distance = calcDistance(myLat, myLng, item.lat, item.lng);
+            completed++;
+            if (completed === batch.length) {
+              queueIndex += 15;
+              renderMapMarkers();
+              renderStationList();
+              setTimeout(nextGeocodeBatch, 100);
+            }
+          } else {
+            geocoder.addressSearch(searchAddr, (result, status) => {
+              if (status === kakao.maps.services.Status.OK) {
+                item.lat = parseFloat(result[0].y);
+                item.lng = parseFloat(result[0].x);
+                item.distance = calcDistance(myLat, myLng, item.lat, item.lng);
+                geocodeCache.set(searchAddr, { lat: item.lat, lng: item.lng });
+              }
+              completed++;
+              if (completed === batch.length) {
+                queueIndex += 15;
+                renderMapMarkers();
+                renderStationList();
+                setTimeout(nextGeocodeBatch, 120);
+              }
+            });
+          }
+        });
+      }
+
+      nextGeocodeBatch();
     }
 
     function getFilteredStations() {
+      // 좌표가 확보된 주유소만 대상
+      let list = rawStationData.filter(st => st.lat !== null);
       if (isOnnuriOnly) {
-        return rawStationData.filter(st => st.isOnnuri);
+        list = list.filter(st => st.isOnnuri);
       }
-      return rawStationData;
+      return list;
     }
 
     function createMarker(st) {
@@ -367,15 +402,32 @@
       activeCustomOverlays.push(customOverlay);
     }
 
+    // 현재 지도 화면 영역(Bounds) 내의 마커만 가볍게 렌더링
     function renderMapMarkers() {
       activeCustomOverlays.forEach(overlay => overlay.setMap(null));
       activeCustomOverlays = [];
+      
+      const bounds = map.getBounds();
       const list = getFilteredStations();
+
       list.forEach(st => {
-        if (st.lat && st.lng) createMarker(st);
+        if (st.lat && st.lng) {
+          const pt = new kakao.maps.LatLng(st.lat, st.lng);
+          if (bounds.contain(pt)) {
+            createMarker(st);
+          }
+        }
       });
     }
 
+    // 지도 이동/확대 축소 시 마커 가볍게 재계산 (디바운스 적용)
+    let mapMoveTimer = null;
+    kakao.maps.event.addListener(map, 'idle', () => {
+      clearTimeout(mapMoveTimer);
+      mapMoveTimer = setTimeout(renderMapMarkers, 150);
+    });
+
+    // 3. 하단 목록 렌더링 (최대 50개까지만 표시하여 스크롤 렉 완전 해소)
     function renderStationList() {
       const listEl = document.getElementById('station-list');
       let sorted = [...getFilteredStations()];
@@ -391,13 +443,15 @@
       }
 
       if (sorted.length === 0) {
-        listEl.innerHTML = `<div style="text-align:center; padding:20px; color:#888;">조건에 맞는 주유소가 없습니다.</div>`;
+        listEl.innerHTML = `<div style="text-align:center; padding:20px; color:#888;">주변 탐색 중이거나 조건에 맞는 주유소가 없습니다.</div>`;
         return;
       }
 
-      listEl.innerHTML = sorted.map(st => {
+      // 상위 50개만 초고속 렌더링
+      const displayList = sorted.slice(0, 50);
+
+      listEl.innerHTML = displayList.map(st => {
         const distStr = (st.distance && st.distance < 1000) ? `${st.distance.toFixed(1)}km` : '';
-        
         const gasEff = getEffectivePrice(st, 'gasoline');
         const dieselEff = getEffectivePrice(st, 'diesel');
         const premEff = getEffectivePrice(st, 'premium');
@@ -405,7 +459,6 @@
         const gasStr = gasEff > 0 ? `${gasEff.toLocaleString()}원` : '-';
         const dieselStr = dieselEff > 0 ? `${dieselEff.toLocaleString()}원` : '-';
         const premStr = premEff > 0 ? `${premEff.toLocaleString()}원` : '-';
-        
         const isSelf = st.isSelf === '셀프';
 
         return `
@@ -453,7 +506,6 @@
       renderMapMarkers();
     }
 
-    // 가격 모드 변경 (기본가 vs 7% 온누리가)
     function setPriceMode(mode) {
       priceMode = mode;
       document.querySelectorAll('.price-mode-btn').forEach(btn => btn.classList.remove('active'));
@@ -462,7 +514,6 @@
       renderStationList();
     }
 
-    // 온누리만 보기 스위치 토글
     function toggleOnnuriOnly(checked) {
       isOnnuriOnly = checked;
       renderMapMarkers();
@@ -493,13 +544,13 @@
           map.setLevel(4);
           map.panTo(loc);
           updateMyLocationMarker(myLat, myLng);
-          updateDistances();
+          renderMapMarkers();
           renderStationList();
         }, () => alert("현재 위치를 가져올 수 없습니다. 브라우저 위치 권한을 확인해주세요."));
       }
     }
 
-    // 바텀시트 제스처
+    // 바텀시트 터치 제스처
     const bottomSheet = document.getElementById('bottom-sheet');
     const dragHandle = document.getElementById('drag-handle');
     const gpsBtn = document.getElementById('gps-btn');
