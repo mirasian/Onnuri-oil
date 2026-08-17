@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>온누리상품권 주유맵</title>
   
-  <!-- iOS Safari 상단 노치/다이내믹 아일랜드 일체화 설정 -->
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <!-- iOS Safari 다이내믹 아일랜드 일체화 설정 -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#ffffff">
 
-  <!-- 파비콘 및 iOS 홈 화면 아이콘 -->
+  <!-- 파비콘 및 홈 화면 아이콘 -->
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="favicon.png">
 
@@ -21,37 +21,38 @@
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     
     html, body {
+      position: fixed;
+      top: 0;
+      left: 0;
       width: 100%;
       height: 100%;
-      height: 100dvh;
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", sans-serif;
-      background: #eef0f3;
+      background: #ffffff;
     }
     
     #app-container {
       position: relative;
       width: 100%;
       height: 100%;
-      height: 100dvh;
       display: flex;
       flex-direction: column;
     }
     
-    /* 지도: 상단 노치 영역까지 확장 */
+    /* 지도: 최상단 노치 뒤편까지 확장 */
     #map {
-      width: 100%;
-      height: 100%;
       position: absolute;
       top: 0;
       left: 0;
+      width: 100%;
+      height: 100%;
       z-index: 1;
     }
 
     /* 상단 헤더: 다이내믹 아일랜드 아래 플로팅 */
     .top-header {
       position: absolute;
-      top: calc(10px + env(safe-area-inset-top));
+      top: calc(8px + env(safe-area-inset-top));
       left: 14px;
       right: 14px;
       z-index: 10;
@@ -106,7 +107,7 @@
     .mini-price-badge:hover { transform: scale(1.1); z-index: 15; }
     .mini-price-badge.selected { background: #d93025; border-color: #ffebee; transform: scale(1.15); z-index: 20; }
 
-    /* 바텀시트 */
+    /* 하단 바텀시트 */
     .bottom-sheet {
       position: absolute;
       bottom: 0;
@@ -114,7 +115,7 @@
       right: 0;
       height: 270px;
       min-height: 130px;
-      max-height: 85dvh;
+      max-height: 85%;
       z-index: 10;
       background: #ffffff;
       border-radius: 22px 22px 0 0;
@@ -154,21 +155,19 @@
       flex-direction: column;
     }
 
-    /* 목록 하단 넉넉한 여백 확보 (사파리 툴바 및 그라데이션 가림 방지) */
     .station-list {
       flex: 1;
       overflow-y: auto;
-      padding: 10px 14px calc(90px + env(safe-area-inset-bottom)) 14px;
+      padding: 10px 14px calc(80px + env(safe-area-inset-bottom)) 14px;
       -webkit-overflow-scrolling: touch;
     }
     
-    /* 하단 미세 블러 그라데이션 */
     .bottom-blur-gradient {
       position: absolute;
       bottom: 0;
       left: 0;
       right: 0;
-      height: calc(35px + env(safe-area-inset-bottom));
+      height: calc(30px + env(safe-area-inset-bottom));
       pointer-events: none;
       background: linear-gradient(to top, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0));
       z-index: 5;
@@ -304,25 +303,13 @@
           gasoline: st.gasoline || "",
           diesel: st.diesel || "",
           premium: st.premium || "",
-          isSelf: st.isSelf || ""
+          isSelf: st.isSelf || "",
+          lat: null,
+          lng: null,
+          distance: 9999
         }));
 
-        updateDistances();
-        renderStationList();
-
-        stationData.forEach(item => {
-          const searchAddr = cleanAddress(item.address);
-          if (!searchAddr) return;
-
-          geocoder.addressSearch(searchAddr, (result, status) => {
-            if (status === kakao.maps.services.Status.OK) {
-              item.lat = parseFloat(result[0].y);
-              item.lng = parseFloat(result[0].x);
-              createMarker(item);
-            }
-          });
-        });
-
+        // GPS 현재 위치 가져오기
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(pos => {
             myLat = pos.coords.latitude;
@@ -333,6 +320,29 @@
             renderStationList();
           });
         }
+
+        renderStationList();
+
+        // 지오코딩 병렬 변환 및 거리 실시간 동기화
+        let geocodeCount = 0;
+        stationData.forEach(item => {
+          const searchAddr = cleanAddress(item.address);
+          if (!searchAddr) return;
+
+          geocoder.addressSearch(searchAddr, (result, status) => {
+            if (status === kakao.maps.services.Status.OK) {
+              item.lat = parseFloat(result[0].y);
+              item.lng = parseFloat(result[0].x);
+              item.distance = calcDistance(myLat, myLng, item.lat, item.lng);
+              createMarker(item);
+            }
+            geocodeCount++;
+            // 일정 주기로 거리 갱신 리렌더링
+            if (geocodeCount % 5 === 0 || geocodeCount === stationData.length) {
+              renderStationList();
+            }
+          });
+        });
       } catch (err) {
         console.error("로드 실패:", err);
       }
@@ -342,8 +352,6 @@
       stationData.forEach(st => {
         if (st.lat && st.lng) {
           st.distance = calcDistance(myLat, myLng, st.lat, st.lng);
-        } else {
-          st.distance = 9999;
         }
       });
     }
@@ -400,7 +408,7 @@
       }
 
       listEl.innerHTML = sorted.map(st => {
-        const distStr = st.distance < 100 ? `${st.distance.toFixed(1)}km` : '';
+        const distStr = (st.distance && st.distance < 1000) ? `${st.distance.toFixed(1)}km` : '';
         const gasStr = (st.gasoline && st.gasoline != 0) ? `${Number(st.gasoline).toLocaleString()}원` : '-';
         const dieselStr = (st.diesel && st.diesel != 0) ? `${Number(st.diesel).toLocaleString()}원` : '-';
         const premStr = (st.premium && st.premium != 0) ? `${Number(st.premium).toLocaleString()}원` : '-';
@@ -414,7 +422,7 @@
                 ${isSelf ? '<span class="self-tag">셀프</span>' : ''}
                 <small style="color:#80868b; font-size:11px;">${st.brand || ''}</small>
               </div>
-              <span class="card-dist">${distStr}</span>
+              ${distStr ? `<span class="card-dist">${distStr}</span>` : ''}
             </div>
             <div class="card-prices">
               <div class="price-item ${selectedFuel === 'gasoline' ? 'highlight' : ''}">
@@ -479,7 +487,7 @@
       }
     }
 
-    // 바텀시트 제스처
+    // 바텀시트 터치 제스처
     const bottomSheet = document.getElementById('bottom-sheet');
     const dragHandle = document.getElementById('drag-handle');
     const gpsBtn = document.getElementById('gps-btn');
