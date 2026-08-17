@@ -12,7 +12,7 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="favicon.png">
 
-  <!-- 카카오맵 JavaScript SDK (키 적용 완료) -->
+  <!-- 카카오맵 SDK -->
   <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=c42d4b9380996995f8fabb3d2cdaaf8f&libraries=services"></script>
   
   <style>
@@ -29,7 +29,7 @@
     #app-container { position: relative; width: 100%; height: 100%; overflow: hidden; }
     #map { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; z-index: 1; }
 
-    /* 상단 헤더: Safe Area 완벽 대응 */
+    /* 상단 헤더 */
     .top-header {
       position: absolute; top: calc(12px + env(safe-area-inset-top)); left: 14px; right: 14px; z-index: 10;
       background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
@@ -82,7 +82,7 @@
       border: 1px solid #d2e3fc;
       box-shadow: 0 4px 14px rgba(0,0,0,0.15);
       border-radius: 20px;
-      padding: 8px 15px;
+      padding: 8px 16px;
       font-size: 12px;
       font-weight: 700;
       cursor: pointer;
@@ -206,14 +206,14 @@
         <div class="filter-switch-wrap">
           <span>온누리만</span>
           <label class="switch">
-            <input type="checkbox" id="onnuri-only-toggle" checked onchange="toggleOnnuriOnly(this.checked)">
+            <input type="checkbox" id="onnuri-only-toggle" onchange="toggleOnnuriOnly(this.checked)">
             <span class="slider"></span>
           </label>
         </div>
       </div>
     </div>
 
-    <!-- 이 지역 재검색 버튼 -->
+    <!-- 이 지역 재검색 플로팅 버튼 -->
     <button class="redo-search-btn" id="redo-btn" onclick="searchCurrentMapArea()">🔄 이 지역 재검색</button>
 
     <button class="gps-btn" id="gps-btn" onclick="moveToCurrentLocation()" title="내 위치 이동">📍</button>
@@ -231,7 +231,7 @@
       </div>
       
       <div class="station-list" id="station-list">
-        <div style="text-align:center; padding: 24px; color:#888; font-size:13px;">온누리 가맹 주유소 로딩 중...</div>
+        <div style="text-align:center; padding: 24px; color:#888; font-size:13px;">주유소 데이터 탐색 중...</div>
       </div>
     </div>
   </div>
@@ -247,12 +247,12 @@
     let selectedFuel = 'gasoline';
     let currentSort = 'gasoline';
     let priceMode = 'normal';
-    let isOnnuriOnly = true;
+    let isOnnuriOnly = false; // 기본값: 전체 주유소 표기 (온누리 필터 옵션)
     let selectedStationId = null;
     let displayLimit = 50;
 
-    // 로컬스토리지 영구 캐시 (월 300만 쿼터 완벽 보호)
-    const CACHE_KEY = "kakao_geo_cache_v2";
+    // 로컬스토리지 영구 캐시
+    const CACHE_KEY = "kakao_geo_cache_v3";
     let persistentCache = {};
     try {
       persistentCache = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
@@ -317,6 +317,7 @@
       }
     }
 
+    // 1. 초기 데이터 수집 및 온누리 전체 사전 지오코딩
     async function initData() {
       try {
         const res = await fetch(APPS_SCRIPT_API_URL);
@@ -347,9 +348,14 @@
           };
         });
 
+        // 1차 캐시 렌더링
         renderMapMarkers();
         renderStationList();
 
+        // 2차 온누리 가맹점 전체(전국 96개) 우선 지오코딩
+        geocodeOnnuriStations();
+
+        // 3차 현재 GPS 위치 수신 및 화면 영역 지오코딩
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(pos => {
             myLat = pos.coords.latitude;
@@ -357,16 +363,34 @@
             map.setCenter(new kakao.maps.LatLng(myLat, myLng));
             updateMyLocationMarker(myLat, myLng);
             updateDistances();
-            processStrictGeocoding();
+            geocodeCurrentArea();
           }, () => {
-            processStrictGeocoding();
+            geocodeCurrentArea();
           });
         } else {
-          processStrictGeocoding();
+          geocodeCurrentArea();
         }
       } catch (err) {
         console.error("로드 실패:", err);
       }
+    }
+
+    // 온누리 가맹점은 전국 어디에 있든 100% 좌표 확보
+    function geocodeOnnuriStations() {
+      const onnuriQueue = rawStationData.filter(st => st.isOnnuri && st.lat === null);
+      onnuriQueue.forEach(item => {
+        if (!item.cleanAddr) return;
+        geocoder.addressSearch(item.cleanAddr, (result, status) => {
+          if (status === kakao.maps.services.Status.OK) {
+            item.lat = parseFloat(result[0].y);
+            item.lng = parseFloat(result[0].x);
+            item.distance = calcDistance(myLat, myLng, item.lat, item.lng);
+            saveCache(item.cleanAddr, item.lat, item.lng);
+            renderMapMarkers();
+            renderStationList();
+          }
+        });
+      });
     }
 
     function updateDistances() {
@@ -377,45 +401,48 @@
       });
     }
 
-    let isGeocoding = false;
-    function processStrictGeocoding() {
-      if (isGeocoding) return;
-      isGeocoding = true;
+    // 2. 현재 화면 중심 기준 행정구역 실시간 감지 및 지오코딩
+    function geocodeCurrentArea() {
+      const center = map.getCenter();
+      
+      // 카카오 좌표 -> 행정구역명 실시간 변환
+      geocoder.coord2RegionCode(center.getLng(), center.getLat(), (result, status) => {
+        if (status === kakao.maps.services.Status.OK && result.length > 0) {
+          const region = result[0];
+          const region1 = region.region_1depth_name; // 예: 광주광역시, 전라남도
+          const region2 = region.region_2depth_name; // 예: 남구, 목포시, 순천시
 
-      let queue = rawStationData.filter(st => st.lat === null);
-      if (isOnnuriOnly) {
-        queue = queue.filter(st => st.isOnnuri);
-      } else {
-        queue = queue.filter(st => st.cleanAddr.includes("광주") || st.cleanAddr.includes("남구") || st.cleanAddr.includes("북구") || st.cleanAddr.includes("서구") || st.cleanAddr.includes("동구") || st.cleanAddr.includes("광산구")).slice(0, 30);
-      }
+          // 현재 보고 있는 지역 주유소 매칭
+          const matchedStations = rawStationData.filter(st => {
+            if (st.lat !== null) return false; // 이미 변환된 것은 제외
+            if (region2 && st.cleanAddr.includes(region2)) return true;
+            if (region1 && st.cleanAddr.includes(region1.substring(0, 2))) return true;
+            return false;
+          }).slice(0, 40); // 40개 일괄 변환
 
-      if (queue.length === 0) {
-        isGeocoding = false;
-        renderMapMarkers();
-        renderStationList();
-        return;
-      }
-
-      let done = 0;
-      queue.forEach(item => {
-        if (!item.cleanAddr) {
-          done++;
-          return;
-        }
-        geocoder.addressSearch(item.cleanAddr, (result, status) => {
-          if (status === kakao.maps.services.Status.OK) {
-            item.lat = parseFloat(result[0].y);
-            item.lng = parseFloat(result[0].x);
-            item.distance = calcDistance(myLat, myLng, item.lat, item.lng);
-            saveCache(item.cleanAddr, item.lat, item.lng);
-          }
-          done++;
-          if (done === queue.length) {
-            isGeocoding = false;
+          let done = 0;
+          if (matchedStations.length === 0) {
             renderMapMarkers();
             renderStationList();
+            return;
           }
-        });
+
+          matchedStations.forEach(item => {
+            geocoder.addressSearch(item.cleanAddr, (res, stat) => {
+              if (stat === kakao.maps.services.Status.OK) {
+                item.lat = parseFloat(res[0].y);
+                item.lng = parseFloat(res[0].x);
+                item.distance = calcDistance(myLat, myLng, item.lat, item.lng);
+                saveCache(item.cleanAddr, item.lat, item.lng);
+              }
+              done++;
+              if (done === matchedStations.length) {
+                renderMapMarkers();
+                renderStationList();
+              }
+            });
+          });
+        }
       });
     }
 
@@ -473,23 +500,24 @@
       redoBtn.classList.add('show');
     });
 
+    // 이 지역 재검색 클릭
     function searchCurrentMapArea() {
       redoBtn.classList.remove('show');
       displayLimit = 50;
-      processStrictGeocoding();
-      renderMapMarkers();
-      renderStationList();
+      geocodeCurrentArea();
     }
 
     function renderStationList() {
       const listEl = document.getElementById('station-list');
       const bounds = map.getBounds();
       
+      // 현재 화면 영역 안의 주유소 필터링
       let candidate = getFilteredStations().filter(st => {
         if (!st.lat || !st.lng) return false;
         return bounds.contain(new kakao.maps.LatLng(st.lat, st.lng));
       });
 
+      // 만약 화면 영역에 잡힌 게 없으면 전체 변환된 주유소 중 거리순 노출
       if (candidate.length === 0) {
         candidate = getFilteredStations();
       }
@@ -507,7 +535,7 @@
       }
 
       if (sorted.length === 0) {
-        listEl.innerHTML = `<div style="text-align:center; padding:20px; color:#888;">조건에 맞는 주유소가 없습니다.</div>`;
+        listEl.innerHTML = `<div style="text-align:center; padding:20px; color:#888;">주유소 데이터 탐색 중...</div>`;
         return;
       }
 
@@ -595,7 +623,6 @@
     function toggleOnnuriOnly(checked) {
       isOnnuriOnly = checked;
       displayLimit = 50;
-      processStrictGeocoding();
       renderMapMarkers();
       renderStationList();
     }
@@ -627,7 +654,7 @@
           redoBtn.classList.remove('show');
           displayLimit = 50;
           updateDistances();
-          processStrictGeocoding();
+          geocodeCurrentArea();
         }, () => alert("현재 위치를 가져올 수 없습니다. 브라우저 위치 권한을 확인해주세요."));
       }
     }
